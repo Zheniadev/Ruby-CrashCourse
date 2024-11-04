@@ -1,54 +1,83 @@
 require 'minitest/autorun'
 require 'minitest/reporters'
-require_relative 'Homework1.rb' 
+require 'date'
+require_relative 'rubyHW1.rb'
 
-Minitest::Reporters.use! Minitest::Reporters::HtmlReporter.new
+Minitest::Reporters.use! [
+  Minitest::Reporters::SpecReporter.new,
+  Minitest::Reporters::JUnitReporter.new,
+  Minitest::Reporters::HtmlReporter.new(
+    reports_dir: 'test/html_reports/spec',
+    reports_filename: 'test_results.html',
+    clean: false
+  )
+]
 
-class StudentTest < Minitest::Test
-  def setup
-    @student1 = Student.new("Nazarenko", "Max", "2006-11-17")
-    @student2 = Student.new("Ivanova", "Anna", "2005-05-20")
-    @student3 = Student.new("Petrov", "Petr", "2004-02-15")
+describe Student do
+  before do
+    Student.class_variable_set(:@@students, [])
+    @student1 = Student.new('Ackles', 'Jensen', Date.new(2024, 1, 1))
+    @student2 = Student.new('Padalecki', 'Jared', Date.new(1995, 5, 15))
+    @student3 = Student.new('Collins', 'Misha', Date.new(1990, 3, 20))
+  end
 
-    # Добавляем студентов в класс
+  it 'correctly initializes a student' do
+    _( @student1.surname ).must_equal 'Ackles'
+    _( @student1.name ).must_equal 'Jensen'
+    _( @student1.date_of_birth ).must_equal Date.new(2024, 1, 1)
+  end
+
+  it 'calculates age correctly' do
+    expected_age = Date.today.year - 2024
+    expected_age -= 1 if Date.today < Date.new(Date.today.year, 1, 1)
+    _( @student1.calculate_age ).must_equal expected_age
+  end
+
+  it 'adds a student successfully' do
+    Student.add_student(@student1)
+    _(Student.students.size).must_equal 1
+    _(Student.students).must_include @student1
+  end
+
+  it 'prevents adding duplicate students' do
+    Student.add_student(@student1)
+    duplicate_student = Student.new('Ackles', 'Jensen', Date.new(2024, 1, 1))
+    Student.add_student(duplicate_student)
+    _(Student.students.size).must_equal 1
+  end
+
+  it 'raises an error for invalid birth dates' do
+    assert_raises(ArgumentError) { Student.new('Collins', 'Misha', Date.new(1990, 3, 20)) }
+  end
+
+  it 'removes a student successfully' do
     Student.add_student(@student1)
     Student.add_student(@student2)
-    Student.add_student(@student3)
-  end
-  
-  def teardown
-    # Очищаем список студентов после каждого теста
-    Student.class_variable_set(:@@students, [])
-  end
-  
-  def test_calculate_age
-    assert_equal 17, @student1.calculate_age
-    assert_equal 19, @student2.calculate_age
-    assert_equal 20, @student3.calculate_age
+    Student.remove_student(@student1)
+    _(Student.students).wont_include @student1
   end
 
-  def test_add_student
-    # Проверяем добавление студента, который уже есть
-    assert_output(/Студент с такими параметрами уже существует/) { Student.add_student(@student1) }
+  it 'returns students by name' do
+    Student.add_student(@student1)
+    Student.add_student(@student2)
+    students_by_name = Student.get_students_by_name('Jensen')
+    _(students_by_name.size).must_equal 1
+    _(students_by_name).must_include @student1
   end
 
-  def test_remove_student
-    assert_output(/Студент Petr Petrov успешно удален./) { Student.remove_student("Petrov", "Petr", "2004-02-15") }
-    assert_output(/Студент с такими параметрами отсутствует/) { Student.remove_student("Petrov", "Petr", "2004-02-15") }
+  it 'returns students by age' do
+    Student.add_student(@student2)
+    students_age = Student.get_students_by_age(@student2.calculate_age)
+    _(students_age.size).must_equal 1
+    _(students_age).must_include @student2
   end
 
-  def test_get_students_by_age
-    # Убедимся, что в списке студентов есть нужные для проверки
-    assert_output(/Студенты с возрастом '17':/) { Student.get_students_by_age(17) }
-    assert_output(/Студенты с возрастом '21' не найдены./) { Student.get_students_by_age(21) }
-  end
-
-  def test_get_students_by_name
-    assert_output(/Студенты с именем 'Max':/) { Student.get_students_by_name("Max") }
-    assert_output(/Студенты с именем 'Olga' не найдены./) { Student.get_students_by_name("Olga") }
-  end
-
-  def test_all_students
-    assert_equal [@student1, @student2, @student3], Student.all_students
+  it 'returns all students' do
+    Student.add_student(@student1)
+    Student.add_student(@student2)
+    all_students = Student.students
+    _(all_students.size).must_equal 2
+    _(all_students).must_include @student1
+    _(all_students).must_include @student2
   end
 end
